@@ -11,38 +11,41 @@ interface Project {
     onlineUrl: string;
     port: number;
     subdomain: string;
-    repo?: string;
+    repo?: string | null;
 }
 
-const projects: Project[] = [
-    { name: "Takvim", localUrl: "http://localhost:3030", onlineUrl: "https://takvim.ibrahimyagci.com", port: 3030, subdomain: "takvim", repo: "niedy707/takvim" },
-    { name: "Asistan", localUrl: "http://localhost:3011", onlineUrl: "https://asistan.ibrahimyagci.com", port: 3011, subdomain: "asistan", repo: "niedy707/asistan-panel" },
-    { name: "Panel", localUrl: "http://localhost:3033", onlineUrl: "https://panel.ibrahimyagci.com", port: 3033, subdomain: "panel", repo: "niedy707/rinoapp-panel" },
-    { name: "RinoInfo", localUrl: "http://localhost:3020", onlineUrl: "https://r.ibrahimyagci.com", port: 3020, subdomain: "r", repo: "niedy707/rhinoplasty-info" },
-    { name: "Kommo", localUrl: "http://localhost:3001", onlineUrl: "https://kommo.ibrahimyagci.com", port: 3001, subdomain: "kommo", repo: "niedy707/kommo" },
-    { name: "CalAPI", localUrl: "http://localhost:3012", onlineUrl: "https://cal-api.ibrahimyagci.com", port: 3012, subdomain: "cal-api", repo: "niedy707/calendar-api" },
-    { name: "Mesai", localUrl: "http://localhost:3031", onlineUrl: "https://mesai.ibrahimyagci.com", port: 3031, subdomain: "mesai", repo: "niedy707/mesai" },
-    { name: "Master", localUrl: "http://localhost:3040", onlineUrl: "https://master.ibrahimyagci.com", port: 3040, subdomain: "master", repo: "niedy707/master-dashboard" },
-];
+
 
 export default function Home() {
+    const [projects, setProjects] = useState<Project[]>([]);
     const [statuses, setStatuses] = useState<Record<string, "online" | "offline" | "checking">>({});
     const [deployments, setDeployments] = useState<Record<string, string | null>>({});
     const [clock, setClock] = useState("");
+
+    // Load projects from API (auto-detects ports from package.json)
+    useEffect(() => {
+        fetch("/api/projects")
+            .then(r => r.json())
+            .then((data: Project[]) => setProjects(data))
+            .catch(console.error);
+    }, []);
 
     useEffect(() => {
         const tick = () =>
             setClock(new Date().toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit", second: "2-digit" }));
         tick();
         const t = setInterval(tick, 1000);
+        if (projects.length === 0) return () => clearInterval(t);
         checkAll();
         fetchAll();
         const s = setInterval(checkAll, 10000);
         const d = setInterval(fetchAll, 5 * 60 * 1000);
         return () => { clearInterval(t); clearInterval(s); clearInterval(d); };
-    }, []);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [projects]);
 
     const checkAll = () => projects.forEach((p) => checkOne(p.name, p.localUrl));
+    const fetchAll = () => projects.forEach((p) => p.repo && fetchOne(p.name, p.repo));
     const checkOne = async (name: string, url: string) => {
         try {
             const r = await fetch(`/api/status?url=${encodeURIComponent(url)}`);
@@ -53,7 +56,7 @@ export default function Home() {
         }
     };
 
-    const fetchAll = () => projects.forEach((p) => p.repo && fetchOne(p.name, p.repo));
+
     const fetchOne = async (name: string, repo: string) => {
         try {
             const r = await fetch(`/api/deployments?repo=${repo}`);
